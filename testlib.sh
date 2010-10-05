@@ -197,11 +197,16 @@ function test_disk_format()
  	for part in $(cat disk_partitions);do
 	echo "mount | grep $part | awk '{ print $5 }'" >> $LOGFILE
 	result=`mount | grep $part | awk '{ print $5 }'`
+
+	if [ $RHEL == 5 ] ; then
+	assert "echo $result" ext3
+	else
 	ext=`mount | grep $part | awk '{print $3}'`
         if [ "$ext" == "/" ] ; then 
 	 assert "echo $result" "ext4"
 	else
 	 assert "echo $result" "ext3"
+	fi
 	fi
 	done
 }
@@ -235,8 +240,13 @@ function test_package_set()
         rc "/bin/rpm -qa --queryformat='%{NAME}\n' > ${file}.tmp"
         #/bin/rpm -qa --queryformat="%{NAME}.%{ARCH}\n" > ${file}.tmp  
         cat ${file}.tmp  |  sort -f > ${file}
-        rc "comm -23 packages ${file}"
-        comm -23 packages ${file} > /tmp/package_diff
+	if [ $RHEL == 5 ] ; then
+        rc "comm -23 packages_5 ${file}"
+        comm -23 packages_5 ${file} > /tmp/package_diff
+	else
+	rc "comm -23 packages_6 ${file}"
+        comm -23 packages_6 ${file} > /tmp/package_diff
+        fi
 	cat /tmp/package_diff >>$LOGFILE
 	assert "cat /tmp/package_diff | wc -l" 1
 	echo "Known sorting error on package=fonts-KOI8-R" >>$LOGFILE
@@ -505,7 +515,11 @@ function open_bugzilla()
 {
 	echo "Installing packages needed to open a bug report. The packages will be removed at the end of the test"
 	echo " "
+	if [ $RHEL == 5 ] ; then
+	rpm -Uvh http://download.fedora.redhat.com/pub/epel/5/i386/epel-release-5-4.noarch.rpm
+	else
 	rpm -Uvh http://download.fedora.redhat.com/pub/epel/beta/6/i386/epel-release-6-4.noarch.rpm
+	fi
 	yum -y install python-bugzilla
 	new_test "## Open a bugzilla"
 	echo ""
@@ -531,7 +545,7 @@ function remove_bugzilla_rpms()
 	echo ""
 	echo "Removing epel-release and python-bugzilla"
 	rpm -e epel-release python-bugzilla
-        rpm -e gpg-pubkey-0608b895-4bd22942	
+        rpm -e gpg-pubkey-0608b895-4bd22942 gpg-pubkey-217521f6-45e8a532 	
     echo ""
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 	echo "Please attach the sosreport bz2 in file /tmp to https://bugzilla.redhat.com/show_bug.cgi?id=$BUGZILLA"
