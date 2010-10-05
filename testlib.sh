@@ -53,9 +53,11 @@ parted -l | grep -B 5 swap | grep ^Disk | awk '{print $2}' | sed '$s/.$//' >> sw
 rm -Rf tmp1_partitions tmp2_partitions
 ### End:  Create a list of partitions
 
-
+RHEL=`cat /etc/redhat-release | awk '{print $7}' | awk -F. '{print $1}'`
 
 echo "IMAGE ID= ${IMAGEID}" >> $LOGFILE
+
+
 
 function new_test()
 {
@@ -248,13 +250,18 @@ function test_verify_rpms()
 	cat $file >> $LOGFILE
 	cat rpmVerifyTable >> $LOGFILE
         assert "cat ${file} | wc -l" "2"
-	
+        if [ $RHEL == 5 ] ; then
         new_test "## Verify Version 1 ... " 
-        assert "/bin/cat /etc/redhat-release" "Red Hat Enterprise Linux Server release 6.0 (Santiago)" # to-do, pass this in
-        
+	assert "/bin/cat /etc/redhat-release" "Red Hat Enterprise Linux Server release 5.5 (Tikanga)" # to-do, pass this in
+       new_test "## Verify Version 2 ... "
+        assert "/bin/rpm -q --queryformat '%{RELEASE}\n' redhat-release | cut -d. -f1,2" "5.5" # to-do, pass this in
+	else
+        new_test "## Verify Version 1 ... " 
+	assert "/bin/cat /etc/redhat-release" "Red Hat Enterprise Linux Server release 6.0 (Santiago)" # to-do, pass this in
         new_test "## Verify Version 2 ... " 
         assert "/bin/rpm -q --queryformat '%{RELEASE}\n' redhat-release-server | cut -d. -f1,2" "6.0" # to-do, pass this in
-
+	fi
+        
 	new_test "## Verify packager ... "
         #file=/tmp/Packager
         #`cat /dev/null > $file`
@@ -291,31 +298,6 @@ function test_bash_history()
 	assert "cat ~/.bash_history | wc -l " 0 
 }
 
-
-function test_install_package()
-{
-        new_test "## install zsh ... "
-        rc "/usr/bin/yum -y install zsh"
-        assert "/bin/rpm -q --queryformat '%{NAME}\n' zsh" zsh
-
-        new_test "## Verify package removal ... "
-        rc "/bin/rpm -e zsh"
-        assert "/bin/rpm -q zsh" "package zsh is not installed"
-
-}
-
-function test_yum_update()
-{
-        new_test "## Verify yum update ... " 
-	assert "/usr/bin/yum -y update"
-}
-
-
-function test_bash_history()
-{
-	new_test "## Verify bash_history ... "
-	assert "cat ~/.bash_history | wc -l " 0 
-}
 
 function test_swap_file()
 {
@@ -365,10 +347,14 @@ function test_passwd()
 
 function test_inittab()
 {
-	new_test "## Verify inittab ... " 
+        if [ $RHEL == 5 ] ;then
+	new_test "## Verify runlevel ... " 
 	assert "cat /etc/inittab | grep id:" "id:3:initdefault:"
 	assert "cat /etc/inittab | grep si:" "si::sysinit:/etc/rc.d/rc.sysinit"
-
+	else	
+	new_test "## Verify runlevel ... " 
+	assert "cat /etc/inittab | grep id:" "id:3:initdefault:"
+	fi
 }
 
 
@@ -376,7 +362,6 @@ function test_shells()
 {
         new_test "## Verify new shells file ... " 
 	assert "cat /etc/shells | grep bash" "/bin/bash"
-	assert "cat /etc/shells | grep ksh" "/bin/ksh"
 	assert "cat /etc/shells | grep nologin" "/sbin/nologin"
 }
 
@@ -431,13 +416,19 @@ function test_sshd()
 
 
 function test_iptables()
-{
+{       
+	if [ $RHEL == 5 ]; then
         new_test "## Verify iptables ... "
         rc_outFile "/etc/init.d/iptables status | grep REJECT"
 	assert "/etc/init.d/iptables status | grep :22 | grep ACCEPT | wc -l " "1" 
 	assert "/etc/init.d/iptables status | grep :80 | grep ACCEPT | wc -l " "1" 
 	assert "/etc/init.d/iptables status | grep :443 | grep ACCEPT | wc -l " "1" 
 	assert "/etc/init.d/iptables status | grep REJECT | grep all | grep 0.0.0.0/0 | grep icmp-host-prohibited |  wc -l " "1" 
+	else
+        new_test "## Verify iptables ... "
+        rc_outFile "/etc/init.d/iptables status | grep REJECT"
+	assert "/etc/init.d/iptables status | grep :22 | grep ACCEPT | wc -l " "1" 
+	fi
 }
 
 function test_chkconfig()
@@ -453,10 +444,13 @@ function test_syslog()
 {
         new_test "## Verify rsyslog is on ... " 
 	assert "chkconfig --list | grep rsyslog | cut -f 5" "3:on"
-
+	if [ $RHEL == 5 ] ; then
 	new_test "## Verify rsyslog config ... "
 	assert "md5sum /etc/rsyslog.conf | cut -f 1 -d  \" \"" "bd4e328df4b59d41979ef7202a05e074"
-	
+	else
+	new_test "## Verify rsyslog config ... "
+	assert "md5sum /etc/rsyslog.conf | cut -f 1 -d  \" \"" "dd356958ca9c4e779f7fac13dde3c1b5"
+	fi
     	#deprecated 
 	#new_test "## Verify syslog config ... "
 	#assert "md5sum /etc/syslog.conf | cut -f 1 -d  \" \"" "213124ef612a63ae63d01e237e103488"
@@ -483,9 +477,14 @@ function test_uname()
         new_test "## Verify kernel name ... "
 	assert "/bin/uname -s" Linux
 
+	if [ $RHEL == 5 ] ; then
 	new_test "## Verify kernel release ... "
+        rt=`rpm -qa kernel\* --queryformat="%{VERSION}-%{RELEASE}\n" | sort -f | uniq`
+        assert "/bin/uname -r | sed -e 's/xen$//g'" $rt
+	else
 	rt=`rpm -qa kernel\* --queryformat="%{VERSION}-%{RELEASE}.%{ARCH}\n" | grep -v noarch | uniq`
 	assert "/bin/uname -r " $rt
+	fi
 
 	new_test "## Verify operating system ... "
 	assert "/bin/uname -o" GNU/Linux
