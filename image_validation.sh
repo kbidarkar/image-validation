@@ -87,7 +87,7 @@ test_chkconfig
 test_syslog
 test_auditd
 test_uname
-test_swap_file
+#test_swap_file
 
 
 ### DONT REMOVE OR COMMENT OUT ###

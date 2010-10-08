@@ -94,6 +94,7 @@ prelink
 python-setuptools
 quota
 readahead
+rh-amazon-rhui-client
 rootfiles
 rsync
 rsyslog

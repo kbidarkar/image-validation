@@ -107,7 +107,7 @@ function assert()
          #echo "IN SECOND TEST" >>$LOGFILE
          echo "${txtgrn}PASS${txtrst}" 
          echo "PASS" >> $LOGFILE
-        elif [ -z $option ] && [ "$rc" == 0 ];then
+        elif [ -z "$option" ] && [ "$rc" == 0 ];then
          #echo "IN THIRD TEST" >>$LOGFILE
          echo "${txtgrn}PASS${txtrst}" 
          echo "PASS" >> $LOGFILE
@@ -273,7 +273,7 @@ function test_verify_rpms()
 	fi
         
 	new_test "## Verify packager ... "
-        #file=/tmp/Packager
+        file=/tmp/Packager
         #`cat /dev/null > $file`
         #echo "for x in $file ;do echo -n $x >> $file; rpm -qi $x | grep Packager >> $file;done" >>$LOGFILE
         for x in $(cat /tmp/rpmqa);do
@@ -431,13 +431,26 @@ function test_iptables()
         new_test "## Verify iptables ... "
         rc_outFile "/etc/init.d/iptables status | grep REJECT"
 	assert "/etc/init.d/iptables status | grep :22 | grep ACCEPT | wc -l " "1" 
-	assert "/etc/init.d/iptables status | grep :80 | grep ACCEPT | wc -l " "1" 
-	assert "/etc/init.d/iptables status | grep :443 | grep ACCEPT | wc -l " "1" 
-	assert "/etc/init.d/iptables status | grep REJECT | grep all | grep 0.0.0.0/0 | grep icmp-host-prohibited |  wc -l " "1" 
+	assert "/etc/init.d/iptables status | grep "dpt:631" | grep ACCEPT | wc -l " "1"
+	assert "/etc/init.d/iptables status | grep "icmp type" | grep ACCEPT | wc -l" "1"
+	assert "/etc/init.d/iptables status | grep "dpt:5353" | grep ACCEPT | wc -l" "1"
+	assert "/etc/init.d/iptables status | grep "RELATED,ESTABLISHED" | grep ACCEPT | wc -l" "1"
+	assert "/etc/init.d/iptables status | grep -e esp -e ah | grep ACCEPT | wc -l" "1"	
+#	assert "/etc/init.d/iptables status | grep :80 | grep ACCEPT | wc -l " "1" 
+#	assert "/etc/init.d/iptables status | grep :443 | grep ACCEPT | wc -l " "1" 
+	assert "/etc/init.d/iptables status | grep REJECT | grep all | grep 0.0.0.0/0 | grep icmp-host-prohibited |  wc -l" "1" 
 	else
         new_test "## Verify iptables ... "
         rc_outFile "/etc/init.d/iptables status | grep REJECT"
-	assert "/etc/init.d/iptables status | grep :22 | grep ACCEPT | wc -l " "1" 
+        assert "/etc/init.d/iptables status | grep :22 | grep ACCEPT | wc -l " "1"
+        assert "/etc/init.d/iptables status | grep "dpt:631" | grep ACCEPT | wc -l " "1"
+        assert "/etc/init.d/iptables status | grep "icmp type" | grep ACCEPT | wc -l" "1"
+        assert "/etc/init.d/iptables status | grep "dpt:5353" | grep ACCEPT | wc -l" "1"
+        assert "/etc/init.d/iptables status | grep "RELATED,ESTABLISHED" | grep ACCEPT | wc -l" "1"
+        assert "/etc/init.d/iptables status | grep -e esp -e ah | grep ACCEPT | wc -l" "1"
+#       assert "/etc/init.d/iptables status | grep :80 | grep ACCEPT | wc -l " "1"
+#       assert "/etc/init.d/iptables status | grep :443 | grep ACCEPT | wc -l " "1"
+        assert "/etc/init.d/iptables status | grep REJECT | grep all | grep 0.0.0.0/0 | grep icmp-host-prohibited |  wc -l" "1"
 	fi
 }
 
@@ -487,15 +500,23 @@ function test_uname()
         new_test "## Verify kernel name ... "
 	assert "/bin/uname -s" Linux
 
-	if [ $RHEL == 5 ] ; then
+	#if [ $RHEL == 5 ] ; then
 	new_test "## Verify kernel release ... "
-        rt=`rpm -qa kernel\* --queryformat="%{VERSION}-%{RELEASE}\n" | sort -f | uniq`
-        assert "/bin/uname -r | sed -e 's/xen$//g'" $rt
-	else
-	rt=`rpm -qa kernel\* --queryformat="%{VERSION}-%{RELEASE}.%{ARCH}\n" | grep -v noarch | uniq`
-	assert "/bin/uname -r " $rt
-	fi
-
+	DEF=`cat /boot/grub/grub.conf | awk -F= '/default/ {print $2}'`
+	let DEF++
+	cat /boot/grub/grub.conf | awk '/title/ {print $NF}' | sed 's/[()]//g' > /tmp/kernel1
+	rt=`sed -n "$DEF"p /tmp/kernel1`
+	#rt=`rpm -qa kernel\* --queryformat="%{VERSION}-%{RELEASE}\n" | sort -f | uniq`
+        assert "/bin/uname -r" $rt
+	#else
+	#new_test "## Verify kernel release ... "
+	#DEF=`cat /boot/grub/grub.conf | awk -F= '/default/ {print $2}'`
+	#let DEF++
+	#cat /boot/grub/grub.conf | awk '/title/ {print $NF}' | sed 's/[()]//g ; s/xen$//g' > /tmp/kernel1
+	#rt=`sed -n "$DEF"p /tmp/kernel1`
+	#rt=`rpm -qa kernel\* --queryformat="%{VERSION}-%{RELEASE}.%{ARCH}\n" | grep -v noarch | uniq`
+        #assert "/bin/uname -r" $rt
+	#fi
 	new_test "## Verify operating system ... "
 	assert "/bin/uname -o" GNU/Linux
 
